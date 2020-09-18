@@ -28,6 +28,8 @@ type
     function ReplaceCurrentRawDataWithString(new_data:string):boolean;
 
     function NavigateToChunk(chain:string):boolean;
+    function ChangeIdOfCurrentChunk(new_id:TChunkId):boolean;
+    function RemoveCurrentChunk():boolean;
   end;
 
   TChunkHeader = packed record
@@ -270,6 +272,8 @@ var
   ofs:TChunkedOffset;
 begin
   result:=false;
+  if not _loaded then exit;
+
   chunk_id_str:='';
   while GetNextSubStr(chain, chunk_id_str, ':') do begin
     ofs:=INVALID_CHUNK;
@@ -289,6 +293,54 @@ begin
 
     if ofs = INVALID_CHUNK then exit;
     if not EnterSubChunk(ofs) then exit;
+  end;
+  result:=true;
+end;
+
+function TChunkedMemory.ChangeIdOfCurrentChunk(new_id: TChunkId): boolean;
+var
+  hdr:pTChunkHeader;
+begin
+  result:=false;
+  if not _loaded then exit;
+  if length(_parent_chunks) = 0 then exit;
+  hdr:=@_data[_parent_chunks[length(_parent_chunks)-1]];
+  hdr^.id:=new_id;
+  result:=true;
+end;
+
+function TChunkedMemory.RemoveCurrentChunk(): boolean;
+var
+  old_data:string;
+  new_buf:array of byte;
+  delta, i:integer;
+  cur_ofs:TChunkedOffset;
+  hdr:pTChunkHeader;
+begin
+  result:=false;
+  if not _loaded then exit;
+  if length(_parent_chunks) = 0 then exit;
+
+  cur_ofs:=_GetCurPos();
+
+  old_data:=GetCurrentChunkRawDataAsString();
+  delta:=-length(old_data)-sizeof(TChunkHeader);
+
+  setlength(new_buf, length(_data)+delta);
+  Move(_data[0], new_buf[0], cur_ofs);
+  Move(_data[cur_ofs+cardinal(length(old_data))], new_buf[cur_ofs-cardinal(sizeof(TChunkHeader))], length(_data)-cur_ofs-cardinal(length(old_data)));
+
+  setlength(_data, length(new_buf));
+  Move(new_buf[0], _data[0], length(new_buf));
+  setlength(new_buf, 0);
+
+  setlength(_parent_chunks, length(_parent_chunks)-1);
+
+  if length(_parent_chunks) > 0 then begin
+    for i:=0 to length(_parent_chunks) - 1 do begin
+      hdr:=@_data[_parent_chunks[i]];
+      hdr^.sz:=int64(hdr^.sz)+delta;
+    end;
   end;
   result:=true;
 end;

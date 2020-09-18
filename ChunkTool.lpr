@@ -118,6 +118,30 @@ begin
         exit;
       end;
 
+    end else if action = 'reindex' then begin
+      if not f.ChangeIdOfCurrentChunk(strtoint(ParamStr(4))) then begin
+        Log('Can''t change index', true);
+        exit;
+      end;
+      if not f.SaveToFile(chunked_file) then begin
+        Log('Can''t update file '+chunked_file, true);
+        exit;
+      end;
+
+    end else if action = 'remove' then begin
+      if buffer_file = 'true' then begin
+        if not f.RemoveCurrentChunk() then begin
+          Log('Can''t remove', true);
+          exit;
+        end;
+        if not f.SaveToFile(chunked_file) then begin
+          Log('Can''t update file '+chunked_file, true);
+          exit;
+        end;
+      end else begin
+          Log('Please confirm removing by entering "true" as 4th parameter', true);
+          exit;
+      end;
     end else begin
       Log('Unknown action '+action, true);
     end;
